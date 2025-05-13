@@ -1,62 +1,17 @@
-import { useEffect, useState } from 'react';
+export default async function handler(req, res) {
+  const { session } = req.query;
 
-export default function FileList() {
-  const [files, setFiles] = useState([]);
-  const [quantities, setQuantities] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+  if (!session) {
+    return res.status(400).json({ error: 'Missing session ID' });
+  }
 
-  const sessionId = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('session')
-    : null;
+  try {
+    const response = await fetch(`https://hook.us2.make.com/jd93nlb43ey4z22edjqwaab4nafjhdva?session=${session}`);
+    const files = await response.json();
 
-  useEffect(() => {
-    if (!session) return;
-    fetch(`/api/files?session=${session}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setFiles(data.files);
-        const qtyMap = {};
-        data.files.forEach(f => qtyMap[f.id] = 1); // default QTY 1
-        setQuantities(qtyMap);
-        setIsLoading(false);
-      });
-  }, [session]);
-
-  const handleQuantityChange = (id, value) => {
-    setQuantities(prev => ({
-      ...prev,
-      [id]: value
-    }));
-    // You can POST this change to Make if needed
-  };
-
-  const handleDelete = async (id) => {
-    await fetch('/api/delete-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, session: session })
-    });
-    setFiles(prev => prev.filter(f => f.id !== id));
-  };
-
-  if (isLoading) return <div>Loading files...</div>;
-
-  return (
-    <div style={{ maxWidth: 600, margin: '0 auto' }}>
-      {files.map(file => (
-        <div key={file.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ flex: 1 }}>{file.name}</span>
-          <input
-            type="number"
-            value={quantities[file.id]}
-            onChange={(e) => handleQuantityChange(file.id, e.target.value)}
-            min="1"
-            style={{ width: 50, marginRight: 10 }}
-          />
-          <button onClick={() => handleDelete(file.id)} style={{ color: 'red' }}>X</button>
-        </div>
-      ))}
-    </div>
-  );
+    res.status(200).json(files);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error fetching files' });
+  }
 }
-
