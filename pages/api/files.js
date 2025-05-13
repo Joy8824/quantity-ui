@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(`https://hook.us2.make.com/jd93nlb43ey4z22edjqwaab4nafjhdva?sessionId=${session}`);
+    const response = await fetch(`https://hook.us2.make.com/jd93nlb43ey4z22edjqwaab4nafjhdva?sessionId=${sessionId}`);
+
     const files = await response.json();
 
     res.status(200).json(files);
