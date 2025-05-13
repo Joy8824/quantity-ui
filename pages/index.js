@@ -10,8 +10,8 @@ export default function FileList() {
     : null;
 
   useEffect(() => {
-    if (!session) return;
-    fetch(`/api/files?session=${session}`)
+    if (!sessionId) return;
+    fetch(`/api/files?sessionId=${sessionId}`)
       .then((res) => res.json())
       .then((data) => {
         setFiles(data.files);
@@ -20,7 +20,7 @@ export default function FileList() {
         setQuantities(qtyMap);
         setIsLoading(false);
       });
-  }, [session]);
+  }, [sessionId]);
 
   const handleQuantityChange = (id, value) => {
     setQuantities(prev => ({
@@ -34,7 +34,7 @@ export default function FileList() {
     await fetch('/api/delete-file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, session: session })
+      body: JSON.stringify({ id, sessionId: sessionId })
     });
     setFiles(prev => prev.filter(f => f.id !== id));
   };
