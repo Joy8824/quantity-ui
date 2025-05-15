@@ -1,77 +1,159 @@
-// pages/index.js
 import { useEffect, useState } from 'react';
 
 export default function FileList() {
-  const [files, setFiles] = useState([]);         // each → { id, name, path_display, quantity }
+  const [files, setFiles] = useState([]);        // each → { id,name,path_display,quantity }
   const [requiredTotal, setRequiredTotal] = useState(null);
+  const [mode, setMode] = useState('edit');      // 'edit' | 'done'
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  /* …fetch logic… */
+  /** sessionId from URL **********************************************/
+  const sessionId =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('session')
+      : null;
+
+  /** fetch files list + requiredTotal ********************************/
   useEffect(() => {
     if (!sessionId) return;
 
     fetch(`/api/files?session=${sessionId}`)
       .then(r => r.json())
       .then(data => {
-        setFiles(data.files.map(f => ({ ...f, quantity: 1 }))); // default qty=1
-        setRequiredTotal(data.requiredTotal);                  //  <– total from Make
+        // default quantity = 1
+        setFiles(data.files.map(f => ({ ...f, quantity: 1 })));
+        setRequiredTotal(data.requiredTotal ?? null);      // Make sends this
         setIsLoading(false);
       });
   }, [sessionId]);
 
-  // helper – live total typed by user
-  const typedTotal = files.reduce((sum, f) => sum + Number(f.quantity || 0), 0);
-  const validQty    = requiredTotal != null && typedTotal === requiredTotal;
+  /** helpers *********************************************************/
+  const updateQty = (idx, qty) => {
+    setFiles(prev => {
+      const clone = [...prev];
+      clone[idx].quantity = qty ? Number(qty) : '';
+      return clone;
+    });
+  };
 
-  /* …event handlers updateQuantity(), handleDelete()… */
+  const handleDelete = async (path_display) => {
+    await fetch('/api/delete-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path_display, session: sessionId })
+    });
+    setFiles(prev => prev.filter(f => f.path_display !== path_display));
+  };
 
-  return isLoading ? (
-      <div>Loading…</div>
-    ) : (
-      <div style={{ maxWidth: 600, margin: '0 auto' }}>
-        {/* file rows */}
-        {files.map((file, i) => (
-          <div key={file.id} style={{ display:'flex', alignItems:'center', marginBottom: 10 }}>
-            <span style={{ flex: 1 }}>{file.name}</span>
-            <input
-              type="number"
-              min="0"
-              value={file.quantity}
-              onChange={e =>
-                setFiles(prev => {
-                  const clone = [...prev];
-                  clone[i].quantity = Number(e.target.value);
-                  return clone;
-                })
-              }
-              style={{ width: 60, marginRight: 10 }}
-            />
-            <button onClick={() => handleDelete(file.path_display)} style={{ color: 'red' }}>❌</button>
-          </div>
-        ))}
+  const grandTotal = files.reduce(
+    (sum, f) => sum + (Number(f.quantity) || 0),
+    0
+  );
 
-        {/* live validation message */}
-        {!validQty && (
-          <p style={{ color: 'red' }}>
-            You’ve entered {typedTotal} / {requiredTotal} pieces.  
-            Please adjust quantities to match the order total.
-          </p>
-        )}
+  const quantitiesValid =
+    files.length > 0 &&
+    files.every(f => Number(f.quantity) > 0) &&
+    requiredTotal != null &&
+    grandTotal === requiredTotal;
 
-        {/* approve button disabled unless quantities match */}
-        <button
-          disabled={!validQty}
-          onClick={handleApprove}
-          style={{
-            padding:'10px 24px',
-            background: validQty ? '#28a745' : '#888',
-            color:'#fff',
-            border:'none',
-            cursor: validQty ? 'pointer' : 'not-allowed'
-          }}
+  /** toggle Done / Edit **********************************************/
+  const toggleMode = () => {
+    if (mode === 'edit') {
+      // Validate before locking
+      if (!quantitiesValid) {
+        setErrorMsg(
+          `Please fill every quantity (≥1) and match the order total of ${requiredTotal}.`
+        );
+        return;
+      }
+      setErrorMsg('');
+      setMode('done');
+    } else {
+      // back to edit
+      setMode('edit');
+    }
+  };
+
+  /** final submission ************************************************/
+  const handleSubmit = async () => {
+    // safe-guard (should already be valid)
+    if (!quantitiesValid) return;
+
+    const resp = await fetch('/api/submit-proof', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, files })
+    });
+
+    const data = await resp.json();
+    if (data.error) {
+      alert('Server error: ' + data.error);
+    } else {
+      alert('Quantities saved – thank you!');
+      // optionally redirect or disable button
+    }
+  };
+
+  /* ======================   RENDER   ====================== */
+  if (isLoading) return <p style={{ textAlign: 'center' }}>Loading…</p>;
+
+  return (
+    <div style={{ maxWidth: 640, margin: '0 auto', fontFamily: 'sans-serif' }}>
+      <h2>Upload Quantities</h2>
+
+      {files.map((file, i) => (
+        <div
+          key={file.id}
+          style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}
         >
-          Approve Proof
+          <span style={{ flex: 1 }}>{file.name}</span>
+
+          <input
+            type="number"
+            min="1"
+            value={file.quantity}
+            disabled={mode === 'done'}
+            onChange={e => updateQty(i, e.target.value)}
+            style={{ width: 70, marginRight: 12 }}
+          />
+
+          {mode === 'edit' && (
+            <button
+              onClick={() => handleDelete(file.path_display)}
+              style={{ color: 'red', border: 'none', background: 'transparent' }}
+            >
+              ❌
+            </button>
+          )}
+        </div>
+      ))}
+
+      {/* Live total & error banner */}
+      <p>
+        Total entered: <strong>{grandTotal}</strong> /{' '}
+        {requiredTotal ?? '—'}
+      </p>
+
+      {errorMsg && (
+        <p style={{ color: 'red', marginTop: -6 }}>{errorMsg}</p>
+      )}
+
+      {/* Action buttons */}
+      <div style={{ marginTop: 20 }}>
+        <button onClick={toggleMode} style={{ marginRight: 12 }}>
+          {mode === 'edit' ? 'Done' : 'Edit'}
         </button>
+
+        {mode === 'done' && (
+          <button
+            onClick={handleSubmit}
+            disabled={!quantitiesValid}
+            style={{ background: quantitiesValid ? '#28a745' : '#888', color: '#fff' }}
+          >
+            Confirm &amp; Continue
+          </button>
+        )}
       </div>
-    )
+    </div>
+  );
 }
