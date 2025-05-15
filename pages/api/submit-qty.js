@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const makeWebhookUrl = 'https://hook.us2.make.com/YOUR_WEBHOOK_URL_HERE'; // ← insert your Make webhook
+    const makeWebhookUrl = 'https://hook.us2.make.com/pf34br22gx660i6jy4pmifbgb5ese96n'; // ← insert your Make webhook
 
     const response = await fetch(makeWebhookUrl, {
       method: 'POST',
