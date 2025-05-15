@@ -1,62 +1,77 @@
+// pages/index.js
 import { useEffect, useState } from 'react';
 
 export default function FileList() {
-  const [files, setFiles] = useState([]);
-  const [quantities, setQuantities] = useState({});
+  const [files, setFiles] = useState([]);         // each → { id, name, path_display, quantity }
+  const [requiredTotal, setRequiredTotal] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const sessionId = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('session')
-    : null;
-
+  /* …fetch logic… */
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/files?sessionId=${sessionId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setFiles(data.files);
-        const qtyMap = {};
-        data.files.forEach(f => qtyMap[f.id] = 1); // default QTY 1
-        setQuantities(qtyMap);
+
+    fetch(`/api/files?session=${sessionId}`)
+      .then(r => r.json())
+      .then(data => {
+        setFiles(data.files.map(f => ({ ...f, quantity: 1 }))); // default qty=1
+        setRequiredTotal(data.requiredTotal);                  //  <– total from Make
         setIsLoading(false);
       });
   }, [sessionId]);
 
-  const handleQuantityChange = (id, value) => {
-    setQuantities(prev => ({
-      ...prev,
-      [id]: value
-    }));
-    // You can POST this change to Make if needed
-  };
+  // helper – live total typed by user
+  const typedTotal = files.reduce((sum, f) => sum + Number(f.quantity || 0), 0);
+  const validQty    = requiredTotal != null && typedTotal === requiredTotal;
 
-  const handleDelete = async (id) => {
-    await fetch('/api/delete-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, sessionId: sessionId })
-    });
-    setFiles(prev => prev.filter(f => f.id !== id));
-  };
+  /* …event handlers updateQuantity(), handleDelete()… */
 
-  if (isLoading) return <div>Loading files...</div>;
+  return isLoading ? (
+      <div>Loading…</div>
+    ) : (
+      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+        {/* file rows */}
+        {files.map((file, i) => (
+          <div key={file.id} style={{ display:'flex', alignItems:'center', marginBottom: 10 }}>
+            <span style={{ flex: 1 }}>{file.name}</span>
+            <input
+              type="number"
+              min="0"
+              value={file.quantity}
+              onChange={e =>
+                setFiles(prev => {
+                  const clone = [...prev];
+                  clone[i].quantity = Number(e.target.value);
+                  return clone;
+                })
+              }
+              style={{ width: 60, marginRight: 10 }}
+            />
+            <button onClick={() => handleDelete(file.path_display)} style={{ color: 'red' }}>❌</button>
+          </div>
+        ))}
 
-  return (
-    <div style={{ maxWidth: 600, margin: '0 auto' }}>
-      {files.map(file => (
-        <div key={file.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ flex: 1 }}>{file.name}</span>
-          <input
-            type="number"
-            value={quantities[file.id]}
-            onChange={(e) => handleQuantityChange(file.id, e.target.value)}
-            min="1"
-            style={{ width: 50, marginRight: 10 }}
-          />
-          <button onClick={() => handleDelete(file.id)} style={{ color: 'red' }}>X</button>
-        </div>
-      ))}
-    </div>
-  );
+        {/* live validation message */}
+        {!validQty && (
+          <p style={{ color: 'red' }}>
+            You’ve entered {typedTotal} / {requiredTotal} pieces.  
+            Please adjust quantities to match the order total.
+          </p>
+        )}
+
+        {/* approve button disabled unless quantities match */}
+        <button
+          disabled={!validQty}
+          onClick={handleApprove}
+          style={{
+            padding:'10px 24px',
+            background: validQty ? '#28a745' : '#888',
+            color:'#fff',
+            border:'none',
+            cursor: validQty ? 'pointer' : 'not-allowed'
+          }}
+        >
+          Approve Proof
+        </button>
+      </div>
+    )
 }
-
