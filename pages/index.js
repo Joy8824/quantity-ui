@@ -17,7 +17,7 @@ export default function FileList() {
   useEffect(() => {
     if (!sessionId) return;
 
-    fetch(`/api/files?sessionId=${sessionId}`)
+    fetch(`/api/files?session=${sessionId}`)
       .then(r => r.json())
       .then(data => {
         // default quantity = 1
