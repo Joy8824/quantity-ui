@@ -8,12 +8,16 @@ export default async function handler(req, res) {
   try {
     const response = await fetch(`https://hook.us2.make.com/jd93nlb43ey4z22edjqwaab4nafjhdva?sessionId=${sessionId}`);
 
-    const text = await response.text();
-    const files = JSON.parse(text); // Manually parse the JSON string from Make
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Make response not OK:', text);
+      return res.status(500).json({ error: 'Make webhook error' });
+    }
 
+    const files = await response.json();
     res.status(200).json(files);
   } catch (error) {
-    console.error('Error fetching or parsing files:', error);
-    res.status(500).json({ error: 'Error fetching files' });
-  }
+  console.error('Fetch error:', error);
+  res.status(500).json({ error: 'Error fetching files', details: error.message });
+}
 }
