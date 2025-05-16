@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   const { sessionId } = req.query;
 
   if (!sessionId) {
-    return res.status(400).json({ error: 'Missing session ID' });
+    return res.status(400).json({error: 'Missing session ID' });
   }
 
   try {
